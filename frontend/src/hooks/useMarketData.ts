@@ -22,20 +22,35 @@ export function useMarketData() {
   const historyRef = useRef<PriceHistory>({});
   const [historyVersion, setHistoryVersion] = useState(0);
   const esRef = useRef<EventSource | null>(null);
+  const lastEventTimeRef = useRef<number>(0);
+  const staleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const connect = useCallback(() => {
     if (esRef.current) {
       esRef.current.close();
     }
+    if (staleTimerRef.current) {
+      clearInterval(staleTimerRef.current);
+    }
 
     const es = new EventSource("/api/stream/prices");
     esRef.current = es;
 
+    staleTimerRef.current = setInterval(() => {
+      if (es.readyState === EventSource.OPEN) {
+        const age = Date.now() - lastEventTimeRef.current;
+        setStatus(age > 3000 ? "reconnecting" : "connected");
+      }
+    }, 1000);
+
     es.onopen = () => {
-      setStatus("connected");
+      lastEventTimeRef.current = Date.now();
     };
 
     const onPrice = (event: MessageEvent) => {
+      lastEventTimeRef.current = Date.now();
+      setStatus("connected");
+
       const data = JSON.parse(event.data) as PriceUpdate | PriceUpdate[];
       const updates = Array.isArray(data) ? data : [data];
 
@@ -62,7 +77,7 @@ export function useMarketData() {
     es.addEventListener("price", onPrice as EventListener);
 
     es.onerror = () => {
-      setStatus("reconnecting");
+      setStatus("disconnected");
     };
   }, []);
 
@@ -70,6 +85,7 @@ export function useMarketData() {
     connect();
     return () => {
       esRef.current?.close();
+      if (staleTimerRef.current) clearInterval(staleTimerRef.current);
     };
   }, [connect]);
 

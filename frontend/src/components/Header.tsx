@@ -39,9 +39,12 @@ export default function Header({
         </div>
         <div className="flex items-center gap-1.5">
           <div
+            data-testid="connection-dot"
             className={`h-2.5 w-2.5 rounded-full ${statusColors[connectionStatus]}`}
           />
-          <span className="text-text-secondary text-xs">{connectionStatus}</span>
+          <span className="text-text-secondary text-xs" data-testid="connection-status">
+            {connectionStatus === "reconnecting" ? "stale" : connectionStatus}
+          </span>
         </div>
       </div>
     </header>

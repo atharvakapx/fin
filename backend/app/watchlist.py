@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -53,7 +53,7 @@ async def get_watchlist():
 
 
 @router.post("", response_model=WatchlistItem)
-async def add_ticker(body: AddTickerRequest):
+async def add_ticker(request: Request, body: AddTickerRequest):
     """Add a ticker to the watchlist."""
     ticker = body.ticker.upper().strip()
     if not ticker:
@@ -74,6 +74,8 @@ async def add_ticker(body: AddTickerRequest):
             (str(uuid.uuid4()), ticker, now),
         )
         await db.commit()
+        if hasattr(request.app.state, "provider"):
+            request.app.state.provider.add_ticker(ticker)
         update = price_cache.get(ticker)
         return WatchlistItem(ticker=ticker, price=update.price if update else None)
     finally:
@@ -81,7 +83,7 @@ async def add_ticker(body: AddTickerRequest):
 
 
 @router.delete("/{ticker}")
-async def remove_ticker(ticker: str):
+async def remove_ticker(request: Request, ticker: str):
     """Remove a ticker from the watchlist."""
     ticker = ticker.upper().strip()
     db = await get_db()
@@ -93,6 +95,8 @@ async def remove_ticker(ticker: str):
         await db.commit()
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail=f"{ticker} not in watchlist")
+        if hasattr(request.app.state, "provider"):
+            request.app.state.provider.remove_ticker(ticker)
         return {"ok": True}
     finally:
         await db.close()

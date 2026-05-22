@@ -39,6 +39,14 @@ class MassiveClient(MarketDataProvider):
         if self._client:
             await self._client.aclose()
 
+    def add_ticker(self, ticker: str) -> None:
+        if ticker not in self._tickers:
+            self._tickers.append(ticker)
+
+    def remove_ticker(self, ticker: str) -> None:
+        if ticker in self._tickers:
+            self._tickers.remove(ticker)
+
     async def _run(self) -> None:
         """Poll loop."""
         while True:

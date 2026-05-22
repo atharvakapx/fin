@@ -78,6 +78,28 @@ class Simulator(MarketDataProvider):
             except asyncio.CancelledError:
                 pass
 
+    def _rebuild_cholesky(self) -> None:
+        corr = _build_correlation_matrix(self._tickers)
+        self._cholesky = np.linalg.cholesky(corr)
+
+    def add_ticker(self, ticker: str) -> None:
+        if ticker in self._prices:
+            return
+        cfg = TICKER_CONFIG.get(ticker, {"seed": 100.0, "drift": 0.08, "vol": 0.30})
+        TICKER_CONFIG.setdefault(ticker, cfg)
+        self._tickers.append(ticker)
+        self._prices[ticker] = cfg["seed"]
+        price_cache.update(ticker, cfg["seed"])
+        self._rebuild_cholesky()
+
+    def remove_ticker(self, ticker: str) -> None:
+        if ticker not in self._prices:
+            return
+        self._tickers.remove(ticker)
+        del self._prices[ticker]
+        if self._tickers:
+            self._rebuild_cholesky()
+
     async def _run(self) -> None:
         """Main simulation loop."""
         while True:
