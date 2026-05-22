@@ -22,6 +22,7 @@ export function useMarketData() {
   const historyRef = useRef<PriceHistory>({});
   const [historyVersion, setHistoryVersion] = useState(0);
   const esRef = useRef<EventSource | null>(null);
+  const lastEventTimeRef = useRef<number>(Date.now());
 
   const connect = useCallback(() => {
     if (esRef.current) {
@@ -38,6 +39,9 @@ export function useMarketData() {
     const onPrice = (event: MessageEvent) => {
       const data = JSON.parse(event.data) as PriceUpdate | PriceUpdate[];
       const updates = Array.isArray(data) ? data : [data];
+
+      lastEventTimeRef.current = Date.now();
+      setStatus("connected");
 
       setPrices((prev) => {
         const next = { ...prev };
@@ -62,14 +66,22 @@ export function useMarketData() {
     es.addEventListener("price", onPrice as EventListener);
 
     es.onerror = () => {
-      setStatus("reconnecting");
+      setStatus("disconnected");
     };
   }, []);
 
   useEffect(() => {
     connect();
+    const stalenessInterval = setInterval(() => {
+      if (esRef.current?.readyState === EventSource.OPEN) {
+        if (Date.now() - lastEventTimeRef.current > 3000) {
+          setStatus("reconnecting");
+        }
+      }
+    }, 1000);
     return () => {
       esRef.current?.close();
+      clearInterval(stalenessInterval);
     };
   }, [connect]);
 

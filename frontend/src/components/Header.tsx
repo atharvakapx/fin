@@ -10,7 +10,7 @@ interface HeaderProps {
 
 const statusColors: Record<ConnectionStatus, string> = {
   connected: "bg-green",
-  reconnecting: "bg-accent-yellow",
+  reconnecting: "bg-accent-yellow animate-pulse",
   disconnected: "bg-red",
 };
 
